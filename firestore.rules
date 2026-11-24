@@ -1,0 +1,206 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isWorldNote(data) {
+      return 'visibility' in data && data.visibility == 'world';
+    }
+
+    function isValidAuthorHandle(data, authorKey) {
+      return data.keys().hasAll(['authorKey', 'uid', 'authorName', 'createdAt'])
+        && data.keys().hasOnly(['authorKey', 'uid', 'authorName', 'createdAt'])
+        && data.authorKey is string
+        && data.authorKey == authorKey
+        && isValidId(data.authorKey)
+        && data.uid is string
+        && data.uid == request.auth.uid
+        && isValidId(data.uid)
+        && data.authorName is string
+        && data.authorName.size() >= 2
+        && data.authorName.size() <= 100
+        && data.createdAt is timestamp;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'authorKey', 'createdAt', 'lastLoginAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'authorKey', 'createdAt', 'lastLoginAt'])
+        && data.uid is string
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && isValidId(data.uid)
+        && data.displayName is string
+        && data.displayName.size() >= 2
+        && data.displayName.size() <= 100
+        && data.authorKey is string
+        && isValidId(data.authorKey)
+        && data.createdAt is timestamp
+        && data.lastLoginAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'providerId', 'createdAt', 'lastLoginAt'])
+        && data.keys().hasOnly(['uid', 'email', 'providerId', 'createdAt', 'lastLoginAt'])
+        && data.uid is string
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && isValidId(data.uid)
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 254
+        && data.providerId is string
+        && data.providerId.size() >= 1
+        && data.providerId.size() <= 64
+        && data.createdAt is timestamp
+        && data.lastLoginAt is timestamp;
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll(['userId', 'authorName', 'authorKey', 'title', 'content', 'category', 'visibility', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'authorName', 'authorKey', 'title', 'content', 'category', 'visibility', 'createdAt', 'updatedAt'])
+        && data.userId is string
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.authorName is string
+        && data.authorName.size() >= 2
+        && data.authorName.size() <= 100
+        && data.authorKey is string
+        && isValidId(data.authorKey)
+        && data.title is string
+        && data.title.size() >= 1
+        && data.title.size() <= 200
+        && data.content is string
+        && data.content.size() <= 100000
+        && data.category is string
+        && data.category.size() >= 1
+        && data.category.size() <= 30
+        && data.visibility is string
+        && (data.visibility == 'private' || data.visibility == 'world')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /authors/{authorKey} {
+      // Single-document lookup allows uniqueness checks without exposing a listable directory.
+      allow get: if isValidId(authorKey);
+      allow list: if false;
+
+      // Only one user can ever claim a given normalized authorKey; updates are forbidden.
+      allow create: if isSignedIn()
+        && isValidId(authorKey)
+        && isValidAuthorHandle(incoming(), authorKey)
+        && incoming().createdAt == request.time;
+
+      allow update: if false;
+
+      allow delete: if isSignedIn()
+        && isValidId(authorKey)
+        && existing().uid == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().lastLoginAt == request.time
+        && getAfter(/databases/$(database)/documents/authors/$(incoming().authorKey)).data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/authors/$(incoming().authorKey)).data.authorName == incoming().displayName;
+
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().lastLoginAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'authorKey', 'lastLoginAt'])
+        && getAfter(/databases/$(database)/documents/authors/$(incoming().authorKey)).data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/authors/$(incoming().authorKey)).data.authorName == incoming().displayName;
+
+      allow delete: if false;
+
+      match /private/{docId} {
+        allow get: if isOwner(userId) && isValidId(userId) && docId == 'info';
+        allow list: if false;
+
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && docId == 'info'
+          && isValidUserPrivateInfo(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().lastLoginAt == request.time
+          && existsAfter(/databases/$(database)/documents/users/$(userId));
+
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && docId == 'info'
+          && isValidUserPrivateInfo(incoming(), userId)
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().lastLoginAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'providerId', 'lastLoginAt'])
+          && exists(/databases/$(database)/documents/users/$(userId));
+
+        allow delete: if false;
+      }
+    }
+
+    match /notes/{noteId} {
+      allow get: if isValidId(noteId)
+        && (isWorldNote(existing()) || (isSignedIn() && existing().userId == request.auth.uid));
+
+      allow list: if isWorldNote(resource.data)
+        || (isSignedIn() && resource.data.userId == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && isValidId(noteId)
+        && isValidNote(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName == incoming().authorName
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.authorKey == incoming().authorKey;
+
+      allow update: if isSignedIn()
+        && isValidId(noteId)
+        && isValidNote(incoming())
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'category', 'visibility', 'authorName', 'authorKey', 'updatedAt'])
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName == incoming().authorName
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.authorKey == incoming().authorKey;
+
+      allow delete: if isSignedIn()
+        && isValidId(noteId)
+        && existing().userId == request.auth.uid;
+    }
+  }
+}

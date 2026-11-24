@@ -1,0 +1,5 @@
+{
+  "name": "Note World",
+  "description": "A private note-taking workspace with categories and search.",
+  "requestFramePermissions": []
+}

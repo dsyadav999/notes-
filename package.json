@@ -1,0 +1,21 @@
+{
+  "name": "note-world",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "node backend/server.js",
+    "build": "npm --prefix frontend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "start": "node backend/server.js",
+    "lint": "npx eslint firestore.rules && node -e \"const cp=require('child_process');['backend/server.js','backend/config/db.js','backend/config/memoryStore.js','backend/controllers/userController.js','backend/controllers/noteController.js','backend/middleware/auth.js'].forEach(f=>cp.execFileSync(process.execPath,['--check',f]))\""
+  },
+  "dependencies": {
+    "@firebase/eslint-plugin-security-rules": "^0.0.2",
+    "eslint": "^10.15.0",
+    "firebase": "^13.4.0"
+  }
+}

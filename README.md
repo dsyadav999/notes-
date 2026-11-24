@@ -1,11 +1,38 @@
-<div align="center">
+# Note World (MERN, MVC)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Notes can be put in categories (pick an existing one or type a new one), and the list can be filtered by category.
 
-  <h1>Built with AI Studio</h2>
+- React -> frontend
+- Node -> server
+- Express -> API
+- MongoDB -> DB
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## API routes
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+| Route | Method | Description |
+|---|---|---|
+| /user/register | POST | Create account |
+| /user/login | POST | Login |
+| /user/logout | POST | Logout |
+| /note/create | POST | Create note |
+| /note/read | GET | Get all my notes (optional `?category=Work` filter) |
+| /note/read/:id | GET | Get one note |
+| /note/update/:id | PUT | Update note |
+| /note/delete/:id | DELETE | Delete note |
 
-</div>
+## Run it
+
+1. Make sure MongoDB is running (`mongod`) or put an Atlas URL in `backend/.env` as `MONGO_URI`.
+2. Backend:
+   ```
+   cd backend
+   npm install
+   npm run dev
+   ```
+3. Frontend (new terminal):
+   ```
+   cd frontend
+   npm install
+   npm run dev
+   ```
+4. Open http://localhost:5173

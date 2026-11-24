@@ -1,0 +1,202 @@
+{
+  "entities": {
+    "AuthorHandle": {
+      "title": "AuthorHandle",
+      "description": "Unique case-insensitive public author name reservation stored at /authors/{authorKey}. Contains no PII.",
+      "type": "object",
+      "properties": {
+        "authorKey": {
+          "type": "string",
+          "description": "Normalized unique author identifier matching document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the single user who owns this author name.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Canonical display casing of the unique author name.",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the author name was claimed."
+        }
+      },
+      "required": ["authorKey", "uid", "authorName", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public-safe user workspace profile stored at /users/{userId}.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the account owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Unique author display name shown in the workspace and on published World notes.",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "authorKey": {
+          "type": "string",
+          "description": "Normalized unique author handle referencing /authors/{authorKey}.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the account was first created."
+        },
+        "lastLoginAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the user's most recent sign-in."
+        }
+      },
+      "required": ["uid", "displayName", "authorKey", "createdAt", "lastLoginAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII login metadata stored at /users/{userId}/private/info.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the account owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Account email address.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "providerId": {
+          "type": "string",
+          "description": "Authentication provider identifier (e.g., google.com or password).",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when login info was first recorded."
+        },
+        "lastLoginAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest sign-in."
+        }
+      },
+      "required": ["uid", "email", "providerId", "createdAt", "lastLoginAt"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "A user note that can be private (owner-only) or world (publicly readable by anyone).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner UID matching request.auth.uid.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Unique author display name matching /users/{userId}.displayName.",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "authorKey": {
+          "type": "string",
+          "description": "Normalized unique author handle matching /users/{userId}.authorKey.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Note headline.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "content": {
+          "type": "string",
+          "description": "Plain-text body content of the note.",
+          "minLength": 0,
+          "maxLength": 100000
+        },
+        "category": {
+          "type": "string",
+          "description": "Category name used for filtering.",
+          "minLength": 1,
+          "maxLength": 30
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["private", "world"],
+          "description": "Visibility scope: 'private' (owner-only) or 'world' (publicly readable)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the note was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the note was last updated."
+        }
+      },
+      "required": [
+        "userId",
+        "authorName",
+        "authorKey",
+        "title",
+        "content",
+        "category",
+        "visibility",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/authors/{authorKey}": {
+      "schema": { "$ref": "#/entities/AuthorHandle" },
+      "description": "Unique author handle registry ensuring only one user UID can own a given author name."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-only user profile document keyed by Firebase Auth UID."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Owner-only private PII login info subcollection (docId: info)."
+    },
+    "/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/Note" },
+      "description": "Notes collection supporting owner-only private notes and publicly readable world notes."
+    }
+  }
+}
